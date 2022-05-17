@@ -18,7 +18,7 @@ subroutine boundary_kinetic(f,sizex,sizev)
 	
 	integer :: i
 	
-	do i=0, 2*B
+	do i=1, 2*B
 		f(-i,:) = f(sizex-i,:)
 		f(sizex+i,:) = f(i,:)
 	enddo
@@ -63,15 +63,15 @@ subroutine Evolution(u,sizex,sizev,ax,ay,dx,dy,dt)
   x_shift(:) = int(xi_arr(:))
   y_shift(:) = int(eta_arr(:))
   
-  do i=1, sizex+1,2
-  do j=3, sizev-3,2
+  do i= 1, sizex+1,2
+  do j= 3, sizev-1,2
   
     do k=1,3
     
       a = 0
       b = 0
       !characteristic origin
-      xi = xi_arr(k) - dt*(2.*ax(j+y_shift(k))/dx)
+      xi  = xi_arr(k)  - dt*(2.*ax(j+y_shift(k))/dx)
       eta = eta_arr(k) - dt*(2.*ay(i+x_shift(k))/dy)
       
       !cell shift
@@ -129,8 +129,8 @@ subroutine Evolution(u,sizex,sizev,ax,ay,dx,dy,dt)
   enddo
   
   !overwrite
-  do i=1,sizex+1,2
-  do j=1,sizev-1,2
+  do i= 1, sizex+1,2
+  do j= 3, sizev-1,2
   do k=1,3
     u(i+x_shift(k),j+y_shift(k)) = newinterfaces(i+x_shift(k),j+y_shift(k))
   enddo
@@ -150,13 +150,13 @@ subroutine Conservation(unew,uhalf,uold,ax,aynew,ayhalf,ayold,dt,dx,dy,sizex,siz
   
   integer :: sizex, sizev
   real(kind=DTYPE) :: dx, dy, dt
-  real(kind=DTYPE) :: ax(0:sizev) !v
-  real(kind=DTYPE) :: aynew(-2*B:sizex+2*B)  !E^{n+1}(x)
-  real(kind=DTYPE) :: ayhalf(-2*B:sizex+2*B) !E^{n+1/2}(x)
-  real(kind=DTYPE) :: ayold(-2*B:sizex+2*B)  !E^{n}(x)
-  real(kind=DTYPE) :: unew(-2*B:sizex+2*B, 0:sizev)  !f^{n+1}(x,v)
-  real(kind=DTYPE) :: uhalf(-2*B:sizex+2*B, 0:sizev) !f^{n+1/2}(x,v)
-  real(kind=DTYPE) :: uold(-2*B:sizex+2*B, 0:sizev)  !f^{n}(x,v)
+  real(kind=DTYPE) :: ax    (0:sizev) !v
+  real(kind=DTYPE) :: aynew (-2*B:sizex+2*B)  !E^{n+1}(x)
+  real(kind=DTYPE) :: ayhalf(-2*B:sizex+2*B)  !E^{n+1/2}(x)
+  real(kind=DTYPE) :: ayold (-2*B:sizex+2*B)  !E^{n}(x)
+  real(kind=DTYPE) :: unew  (-2*B:sizex+2*B, 0:sizev)  !f^{n+1}(x,v)
+  real(kind=DTYPE) :: uhalf (-2*B:sizex+2*B, 0:sizev) !f^{n+1/2}(x,v)
+  real(kind=DTYPE) :: uold  (-2*B:sizex+2*B, 0:sizev)  !f^{n}(x,v)
   
   integer :: i, j
   real(kind=DTYPE) :: flux_left, flux_right, flux_top, flux_bottom
@@ -167,7 +167,7 @@ subroutine Conservation(unew,uhalf,uold,ax,aynew,ayhalf,ayold,dt,dx,dy,sizex,siz
   dt_dxdy = dt/(dx*dy)
   
   do i=1,sizex-1,2
-  do j=1,sizev-1,2
+  do j=3,sizev-1,2
   
     !composite Simpsons rule
     flux_left = (1./36.)*((ax(j-1)*uold(i-1,j-1)+ax(j+1)*uold(i-1,j+1)+ax(j-1)*unew(i-1,j-1)+ax(j+1)*unew(i-1,j+1)) & 
@@ -200,7 +200,7 @@ subroutine Conservation(unew,uhalf,uold,ax,aynew,ayhalf,ayold,dt,dx,dy,sizex,siz
   
   !overwrite
   do i=1,sizex-1,2
-  do j=1,sizev-1,2
+  do j=3,sizev-1,2
     unew(i,j) = newavg(i,j)
   enddo
   enddo

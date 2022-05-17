@@ -3,7 +3,7 @@
 module parameters
   implicit none 
   
-  integer, parameter :: dimX = 64
+  integer, parameter :: dimX = 32
   integer, parameter :: dimV = 64
   
   integer, parameter :: sizex = 2*dimX
@@ -26,7 +26,7 @@ module parameters
   real(kind=DTYPE), parameter :: dv = (ve-vb)/dimV
   
   real(kind=DTYPE), parameter :: dt = 0.01
-  real(kind=DTYPE), parameter :: tmax = 10
+  real(kind=DTYPE), parameter :: tmax = 45.
   
   
   real(kind=DTYPE), parameter :: me = 1.

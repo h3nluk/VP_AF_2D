@@ -85,7 +85,7 @@ subroutine calcRho(fe,fi,rho,sizex,sizev,dv,qe,qi)
 
 	do ix=0,sizex !0, mx
 		rho(ix) = 0.
-		do iv=0,sizev !1, mvx
+		do iv=1,sizev-1 !1, mvx
 			rho(ix) = rho(ix) + qe*fe(ix,iv) + qi*fi(ix,iv)
 		enddo
 			rho(ix) = -rho(ix)*dv !TODO: Vorzeichen ???

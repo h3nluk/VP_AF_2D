@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 dat = np.genfromtxt('f.dat')
 dat0 = np.genfromtxt('f0.dat')
 
+dat = dat[4:-4, 4:-4]
+dat0 = dat0[4:-4, 4:-4]
+
 fig, axs = plt.subplots(1,3)
 
 axs[0].imshow(dat)

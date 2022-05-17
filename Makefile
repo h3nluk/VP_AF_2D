@@ -32,6 +32,6 @@ clean:
 	rm *.o *.mod *.dat main
 	
 plot:
-	#$(PY) plotResults.py 
+	$(PY) plotResults.py 
 	$(PY) plotDistribution.py
 	$(PY) plotSlices.py
