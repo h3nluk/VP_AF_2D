@@ -103,8 +103,8 @@ program AF_Vlasov
   call init_averaging(fe,sizex,sizev,dx,dv)
   call boundary_kinetic(fe,sizex,sizev)
   
-  call get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
-  call boundary_fluid(E,sizex)
+!~   call get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
+!~   call boundary_fluid(E,sizex)
   
   call output_kinetic(fe,sizex,sizev,0)
   
@@ -116,24 +116,36 @@ program AF_Vlasov
     feold(:,:)  = fe(:,:) !t^n
     fehalf(:,:) = fe(:,:) !t^{n+1/2}
     
+    call get_E_gauss_seidel(fe,fi,rho,phi,Eold,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
+    call boundary_fluid(Eold,sizex)
+    write(*,*) "Gauss-Seidel"
+    
+    Eold(:) = -1.*Eold(:) ! ???
+    
+    !half timestep interface update
+    call Evolution(fehalf,sizex,sizev,v,Eold,dx,dv,0.5*dt)
+    call boundary_kinetic(fehalf,sizex,sizev)
+    write(*,*) "Half timestep"
+    
+    call get_E_gauss_seidel(fehalf,fi,rho,phi,Ehalf,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
+    call boundary_fluid(Ehalf,sizex)
+    write(*,*) "Gauss-Seidel"
+    
+    Ehalf(:) = -1.*Ehalf(:) ! ???
+    
+    !full timestep interface update
+    call Evolution(fe,sizex,sizev,v,Ehalf,dx,dv,dt)
+    call boundary_kinetic(fe,sizex,sizev)
+    write(*,*) "Full timestep"
+    
     call get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
     call boundary_fluid(E,sizex)
     write(*,*) "Gauss-Seidel"
     
     E(:) = -1.*E(:) ! ???
     
-    !full timestep interface update
-    call Evolution(fe,sizex,sizev,v,E,dx,dv,dt)
-    call boundary_kinetic(fe,sizex,sizev)
-    write(*,*) "Full timestep"
-    
-    !half timestep interface update
-    call Evolution(fehalf,sizex,sizev,v,E,dx,dv,0.5*dt)
-    call boundary_kinetic(fehalf,sizex,sizev)
-    write(*,*) "Half timestep"
-
     !update cell average
-    call Conservation(fe,fehalf,feold,v,E,E,E,dt,dx,dv,sizex,sizev)
+    call Conservation(fe,fehalf,feold,v,E,Ehalf,Eold,dt,dx,dv,sizex,sizev)
     call boundary_kinetic(fe,sizex,sizev)
     write(*,*) "Conservation"
     
