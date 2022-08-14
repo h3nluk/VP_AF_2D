@@ -22,7 +22,7 @@ subroutine output_kinetic(fs,sizex,sizev,a)
   
   implicit none 
   integer :: sizex, sizev, a
-  real(kind=DTYPE) :: fs(-2*B:sizex+2*B,0:sizev)
+  real(kind=DTYPE) :: fs(-2*B:sizex+2*B,-2*B:sizev+2*B)
   
   integer :: i, j
   

@@ -22,7 +22,7 @@ subroutine boundary_fluid(E,sizex)
 			
 	integer :: i
 			
-	do i=0, 2*B
+	do i=1, 2*B
 		E(-i) = E(sizex-i)
 		E(sizex+i) = E(i)
 	end do
@@ -34,8 +34,8 @@ subroutine get_E_schwarz(fe,fi,rho,phi,E,sizex,sizev,dx,dv,qe,qi)
 	implicit none 
   
 	integer :: sizex, sizev
-	real(kind=DTYPE) :: fe(-2*B:sizex+2*B,0:sizev), fi(-2*B:sizex+2*B,0:sizev)
-	real(kind=DTYPE) :: rho(-2*B:sizex+2*B), phi(-2*B:sizex+2*B), E(-2*B:sizex+2*B)
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B,-2*B:sizev+2*B) :: fe, fi
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B) :: rho, phi, E
 	real(kind=DTYPE) :: dx, dv, qe, qi
   
 	integer :: ix, iv
@@ -51,8 +51,8 @@ subroutine get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,dx,dv,qe,qi)
 	implicit none 
 			  
 	integer :: sizex, sizev
-	real(kind=DTYPE) :: fe(-2*B:sizex+2*B,0:sizev), fi(-2*B:sizex+2*B,0:sizev)
-	real(kind=DTYPE) :: rho(-2*B:sizex+2*B), phi(-2*B:sizex+2*B), E(-2*B:sizex+2*B)
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B,-2*B:sizev+2*B) :: fe, fi
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B) :: rho, phi, E
 	real(kind=DTYPE) :: dx, dv, qe, qi
 			  
 	integer :: iter
@@ -79,13 +79,13 @@ subroutine calcRho(fe,fi,rho,sizex,sizev,dv,qe,qi)
 	integer :: sizex,sizev
 	real(kind=DTYPE) :: dv, qe, qi
 	real(kind=DTYPE) :: rho(-2*B:sizex+2*B)
-	real(kind=DTYPE) :: fe(-2*B:sizex+2*B,0:sizev), fi(-2*B:sizex+2*B,0:sizev)
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B,-2*B:sizev+2*B) :: fe, fi
 
 	integer :: ix, iv
 
 	do ix=0,sizex !0, mx
 		rho(ix) = 0.
-		do iv=1,sizev-1 !1, mvx
+		do iv=0,sizev !1, mvx
 			rho(ix) = rho(ix) + qe*fe(ix,iv) + qi*fi(ix,iv)
 		enddo
 			rho(ix) = -rho(ix)*dv !TODO: Vorzeichen ???

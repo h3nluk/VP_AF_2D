@@ -7,14 +7,62 @@ implicit none
 contains
 	
 		
-!#################BOUNDARY#############################
+subroutine init_averaging(f,sizex,sizev,dx,dv)
+  
+  implicit none 
+  
+  integer :: sizex,sizev
+  real(kind=DTYPE) :: dx,dv
+  real(kind=DTYPE) :: f(-2*B:sizex+2*B,-2*B:sizev+2*B)
+  
+  integer :: i, j
+  real(kind=DTYPE) :: avg
+  
+  do i=1, sizex-1, 2
+  do j=1, sizev-1, 2
+    
+    !naive averaging
+    !avg = (1./9.)*(f(i-1,j)+f(i+1,j)+f(i,j-1)+f(i,j+1)+f(i+1,j+1)+f(i+1,j-1)+f(i-1,j+1)+f(i-1,j-1)+f(i,j))
+    
+    !Simpson averaging
+    avg = (1./36.)*((f(i-1,j-1)+f(i-1,j+1)+f(i+1,j+1)+f(i+1,j-1)) + 4.*(f(i-1,j)+f(i+1,j)+f(i,j-1)+f(i,j+1)) + 16.*f(i,j))
+    
+    f(i,j) = avg
+    
+  enddo
+  enddo
+  
+end subroutine init_averaging
+
+subroutine boundary(u,sizex,sizev)
+  !periodic boundary condition
+  implicit none
+
+  integer :: sizex, sizev
+  real(kind=DTYPE) :: u(-2*B:sizex+2*B,-2*B:sizev+2*B)
+
+  integer :: ix,iy
+
+  !x-direction
+  do ix=1,2*B
+    u(-ix,:) = u(sizex-ix,:)
+    u(sizex+ix,:) = u(ix,:)
+  enddo
+  
+  !y-direction
+  do iy=1,2*B
+    u(:,-iy) = u(:,sizev-iy)
+    u(:,sizev+iy) = u(:,iy)
+  enddo
+  
+end subroutine boundary
 
 subroutine boundary_kinetic(f,sizex,sizev)
 
 	implicit none 
 	
 	integer :: sizex,sizev
-	real(kind=DTYPE) :: f(-2*B:sizex+2*B,0:sizev)
+	real(kind=DTYPE) :: f(-2*B:sizex+2*B,-2*B:sizev+2*B)
 	
 	integer :: i
 	
@@ -24,25 +72,23 @@ subroutine boundary_kinetic(f,sizex,sizev)
 	enddo
 
 end subroutine boundary_kinetic
-		
-!##############ADVECTION_SOVLER##########################
-		
+
 subroutine Evolution(u,sizex,sizev,ax,ay,dx,dy,dt)
   
   implicit none 
   
   integer :: sizex, sizev
   real(kind=DTYPE) :: dx, dy, dt
-  real(kind=DTYPE) :: ax(0:sizev) !v
+  real(kind=DTYPE) :: ax(-2*B:sizev+2*B) !v
   real(kind=DTYPE) :: ay(-2*B:sizex+2*B) !Ex
-  real(kind=DTYPE) :: u(-2*B:sizex+2*B, 0:sizev) !f(x,v)
+  real(kind=DTYPE) :: u(-2*B:sizex+2*B,-2*B:sizev+2*B) !f(x,v)
   
   integer :: i,j,k,a,b
   integer :: Nx,Ny,Sx,Sy,Wx,Wy,Ex,Ey,Cx,Cy
   integer :: x_shift(3), y_shift(3)
   real(kind=DTYPE) :: xi,eta,xi_eta,xisq,etasq,nodes,edges,bubble
   real(kind=DTYPE) :: xi_arr(3), eta_arr(3)
-  real(kind=DTYPE) :: newinterfaces(-2*B:sizex+2*B, 0:sizev)
+  real(kind=DTYPE) :: newinterfaces(-2*B:sizex+2*B,-2*B:sizev+2*B)
   
   !tracing
   
@@ -63,8 +109,8 @@ subroutine Evolution(u,sizex,sizev,ax,ay,dx,dy,dt)
   x_shift(:) = int(xi_arr(:))
   y_shift(:) = int(eta_arr(:))
   
-  do i= 1, sizex+1,2
-  do j= 3, sizev-1,2
+  do i=1, sizex+1,2
+  do j=1, sizev+1,2
   
     do k=1,3
     
@@ -118,7 +164,7 @@ subroutine Evolution(u,sizex,sizev,ax,ay,dx,dy,dt)
       bubble = (1./16.)*(36.*u(Cx,Cy)-(u(Wx,Sy)+u(Wx,Ny) &
              + u(Ex,Ny)+u(Ex,Sy)) &
              - 4.*(u(Wx,Cy)+u(Ex,Cy)+u(Cx,Ny)+u(Cx,Sy))) &
-             * (1-xisq)*(1-etasq)
+             * (1.-xisq)*(1.-etasq)
 
       newinterfaces(i+x_shift(k),j+y_shift(k)) = nodes + edges + bubble
 !~       newinterfaces(i+x_shift(k),j+y_shift(k)) = k
@@ -129,10 +175,12 @@ subroutine Evolution(u,sizex,sizev,ax,ay,dx,dy,dt)
   enddo
   
   !overwrite
-  do i= 1, sizex+1,2
-  do j= 3, sizev-1,2
+  do i=1,sizex+1,2
+  do j=1,sizev+1,2
   do k=1,3
-    u(i+x_shift(k),j+y_shift(k)) = newinterfaces(i+x_shift(k),j+y_shift(k))
+  
+    u(i+x_shift(k), j+y_shift(k)) = newinterfaces(i+x_shift(k), j+y_shift(k))
+  
   enddo
   enddo
   enddo
@@ -150,41 +198,47 @@ subroutine Conservation(unew,uhalf,uold,ax,aynew,ayhalf,ayold,dt,dx,dy,sizex,siz
   
   integer :: sizex, sizev
   real(kind=DTYPE) :: dx, dy, dt
-  real(kind=DTYPE) :: ax    (0:sizev) !v
+  real(kind=DTYPE) :: ax(-2*B:sizev+2*B) !v
+  
   real(kind=DTYPE) :: aynew (-2*B:sizex+2*B)  !E^{n+1}(x)
-  real(kind=DTYPE) :: ayhalf(-2*B:sizex+2*B)  !E^{n+1/2}(x)
+  real(kind=DTYPE) :: ayhalf(-2*B:sizex+2*B) !E^{n+1/2}(x)
   real(kind=DTYPE) :: ayold (-2*B:sizex+2*B)  !E^{n}(x)
-  real(kind=DTYPE) :: unew  (-2*B:sizex+2*B, 0:sizev)  !f^{n+1}(x,v)
-  real(kind=DTYPE) :: uhalf (-2*B:sizex+2*B, 0:sizev) !f^{n+1/2}(x,v)
-  real(kind=DTYPE) :: uold  (-2*B:sizex+2*B, 0:sizev)  !f^{n}(x,v)
+  
+  real(kind=DTYPE) :: unew (-2*B:sizex+2*B,-2*B:sizev+2*B)  !f^{n+1}(x,v)
+  real(kind=DTYPE) :: uhalf(-2*B:sizex+2*B,-2*B:sizev+2*B)  !f^{n+1/2}(x,v)
+  real(kind=DTYPE) :: uold (-2*B:sizex+2*B,-2*B:sizev+2*B)  !f^{n}(x,v)
   
   integer :: i, j
   real(kind=DTYPE) :: flux_left, flux_right, flux_top, flux_bottom
   real(kind=DTYPE) :: dt_dxdy
-  real(kind=DTYPE) :: newavg(-2*B:sizex+2*B, 0:sizev)
+  real(kind=DTYPE) :: newavg(-2*B:sizex+2*B,-2*B:sizev+2*B)
   
   !update average
   dt_dxdy = dt/(dx*dy)
   
   do i=1,sizex-1,2
-  do j=3,sizev-1,2
+  do j=1,sizev-1,2
   
     !composite Simpsons rule
-    flux_left = (1./36.)*((ax(j-1)*uold(i-1,j-1)+ax(j+1)*uold(i-1,j+1)+ax(j-1)*unew(i-1,j-1)+ax(j+1)*unew(i-1,j+1)) & 
+    flux_left = (1./36.)* &
+    ( (ax(j-1)*uold(i-1,j-1)+ax(j+1)*uold(i-1,j+1)+ax(j-1)*unew(i-1,j-1)+ax(j+1)*unew(i-1,j+1)) & 
     + 4.* (ax(j)*(uold(i-1,j)+unew(i-1,j))+ax(j-1)*uhalf(i-1,j-1)+ax(j+1)*uhalf(i-1,j+1)) & 
-    + 16.*ax(j)*uhalf(i-1,j))
+    + 16.*ax(j)*uhalf(i-1,j) )
     
-    flux_right = (1./36.)*((ax(j-1)*uold(i+1,j-1)+ax(j+1)*uold(i+1,j+1)+ax(j-1)*unew(i+1,j-1)+ax(j+1)*unew(i+1,j+1)) & 
+    flux_right = (1./36.)* &
+    ( (ax(j-1)*uold(i+1,j-1)+ax(j+1)*uold(i+1,j+1)+ax(j-1)*unew(i+1,j-1)+ax(j+1)*unew(i+1,j+1)) & 
     + 4.* (ax(j)*(uold(i+1,j)+unew(i+1,j))+ax(j-1)*uhalf(i+1,j-1)+ax(j+1)*uhalf(i+1,j+1)) & 
-    + 16.*ax(j)*uhalf(i+1,j))
+    + 16.*ax(j)*uhalf(i+1,j) )
     
-    flux_top = (1./36.)*((ayold(i-1)*uold(i-1,j+1)+ayold(i+1)*uold(i+1,j+1)+aynew(i-1)*unew(i-1,j+1)+aynew(i+1)*unew(i+1,j+1)) & 
+    flux_top = (1./36.)* &
+    ( (ayold(i-1)*uold(i-1,j+1)+ayold(i+1)*uold(i+1,j+1)+aynew(i-1)*unew(i-1,j+1)+aynew(i+1)*unew(i+1,j+1)) & 
     + 4.* (ayold(i)*uold(i,j+1)+aynew(i)*unew(i,j+1)+ayhalf(i-1)*uhalf(i-1,j+1)+ayhalf(i+1)*uhalf(i+1,j+1)) & 
-    + 16.*ayhalf(i)*uhalf(i,j+1))
+    + 16.*ayhalf(i)*uhalf(i,j+1) )
     
-    flux_bottom = (1./36.)*((ayold(i-1)*uold(i-1,j-1)+ayold(i+1)*uold(i+1,j-1)+aynew(i-1)*unew(i-1,j-1)+aynew(i+1)*unew(i+1,j-1)) & 
+    flux_bottom = (1./36.)* &
+    ( (ayold(i-1)*uold(i-1,j-1)+ayold(i+1)*uold(i+1,j-1)+aynew(i-1)*unew(i-1,j-1)+aynew(i+1)*unew(i+1,j-1)) & 
     + 4.* (ayold(i)*uold(i,j-1)+aynew(i)*unew(i,j-1)+ayhalf(i-1)*uhalf(i-1,j-1)+ayhalf(i+1)*uhalf(i+1,j-1)) & 
-    + 16.*ayhalf(i)*uhalf(i,j-1))
+    + 16.*ayhalf(i)*uhalf(i,j-1) )
   
     !Finite Volume update
     newavg(i,j) = uold(i,j) - dt_dxdy &
@@ -200,8 +254,10 @@ subroutine Conservation(unew,uhalf,uold,ax,aynew,ayhalf,ayold,dt,dx,dy,sizex,siz
   
   !overwrite
   do i=1,sizex-1,2
-  do j=3,sizev-1,2
+  do j=1,sizev-1,2
+  
     unew(i,j) = newavg(i,j)
+  
   enddo
   enddo
   

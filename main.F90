@@ -10,10 +10,10 @@ subroutine init(fe,fi,v, xb, xe, vb, ve, sizex,sizev)
   !real(kind=DTYPE) :: fe_val(0:sizex(1),0:sizex(2),0:sizex(3),0:sizev(1),0:sizev(2),0:sizev(3))
   !real(kind=DTYPE) :: fi_val(0:sizex(1),0:sizex(2),0:sizex(3),0:sizev(1),0:sizev(2),0:sizev(3))
   
-  real(kind=DTYPE) :: fe(-2*B:sizex+2*B, 0:sizev)
-  real(kind=DTYPE) :: fi(-2*B:sizex+2*B, 0:sizev)
+  real(kind=DTYPE) :: fe(-2*B:sizex+2*B, -2*B:sizev+2*B)
+  real(kind=DTYPE) :: fi(-2*B:sizex+2*B, -2*B:sizev+2*B)
   
-  real(kind=DTYPE) :: v(0:sizev)
+  real(kind=DTYPE) :: v(-2*B:sizev+2*B)
   
   integer :: ix,iv
   real(kind=DTYPE) :: x,vx,v2,v0
@@ -32,7 +32,7 @@ subroutine init(fe,fi,v, xb, xe, vb, ve, sizex,sizev)
 
     x = xb + ix*dx_val
     
-    do iv=0,sizev
+    do iv= 0,sizev
     
       vx = vb + iv*dv_val
       v(iv) = vx
@@ -82,11 +82,13 @@ program AF_Vlasov
   write(*,*) '-------------------------------'
   write (*,*) 'Init'
   
-  allocate(fe    (-2*B:sizex+2*B,0:sizev))
-  allocate(fehalf(-2*B:sizex+2*B,0:sizev))
-  allocate(feold (-2*B:sizex+2*B,0:sizev))
-  allocate(fi    (-2*B:sizex+2*B,0:sizev))
-  allocate(v     (0:sizev))
+  allocate(fe    (-2*B:sizex+2*B,-2*B:sizev+2*B))
+  allocate(fehalf(-2*B:sizex+2*B,-2*B:sizev+2*B))
+  allocate(feold (-2*B:sizex+2*B,-2*B:sizev+2*B))
+  allocate(fi    (-2*B:sizex+2*B,-2*B:sizev+2*B))
+  
+  allocate(v     (-2*B:sizev+2*B))
+  
   allocate(E     (-2*B:sizex+2*B))
   allocate(Ehalf (-2*B:sizex+2*B))
   allocate(Eold  (-2*B:sizex+2*B))
@@ -95,10 +97,13 @@ program AF_Vlasov
   
   call init(fe,fi,v,xb,xe,vb,ve,sizex,sizev)
   
-  call get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
-  
   call boundary_kinetic(fe,sizex,sizev)
   call boundary_kinetic(fi,sizex,sizev)
+  
+  call init_averaging(fe,sizex,sizev,dx,dv)
+  call boundary_kinetic(fe,sizex,sizev)
+  
+  call get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
   call boundary_fluid(E,sizex)
   
   call output_kinetic(fe,sizex,sizev,0)
