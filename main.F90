@@ -116,7 +116,7 @@ program AF_Vlasov
     feold(:,:)  = fe(:,:) !t^n
     fehalf(:,:) = fe(:,:) !t^{n+1/2}
     
-    call get_E_gauss_seidel(fe,fi,rho,phi,Eold,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
+    call get_E_gauss_seidel_point(fe,fi,rho,phi,Eold,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
     call boundary_fluid(Eold,sizex)
     write(*,*) "Gauss-Seidel"
     
@@ -127,7 +127,7 @@ program AF_Vlasov
     call boundary_kinetic(fehalf,sizex,sizev)
     write(*,*) "Half timestep"
     
-    call get_E_gauss_seidel(fehalf,fi,rho,phi,Ehalf,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
+    call get_E_gauss_seidel_point(fehalf,fi,rho,phi,Ehalf,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
     call boundary_fluid(Ehalf,sizex)
     write(*,*) "Gauss-Seidel"
     
@@ -138,7 +138,7 @@ program AF_Vlasov
     call boundary_kinetic(fe,sizex,sizev)
     write(*,*) "Full timestep"
     
-    call get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
+    call get_E_gauss_seidel_point(fe,fi,rho,phi,E,sizex,sizev,0.5*dx,0.5*dv,qe,qi)
     call boundary_fluid(E,sizex)
     write(*,*) "Gauss-Seidel"
     

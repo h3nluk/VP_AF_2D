@@ -6,14 +6,43 @@ implicit none
 	
 contains
 		
-!~ real(kind=DTYPE) function reconstruction(L,R,avg,xi)
+real(kind=DTYPE) function reconstruction1D(f,i,ibeg,iend,xi) result (reco)
 		
-!~ 	implicit none
-!~ 	real(kind=DTYPE) :: L,R,avg,xi
+	implicit none
+	
+	integer :: i, ibeg, iend
+	real(kind=DTYPE) :: f(ibeg:iend), xi
+	
 			
-!~ 	reconstruction = L*(3.*xi**2 -4.*xi+1.)+avg*(6.*xi-6.*xi**2)+R*(3.*xi**2 -2.*xi)
+	reco = f(i-1)*(3.*xi**2 -4.*xi+1.)+f(i)*(6.*xi-6.*xi**2)+f(i+1)*(3.*xi**2 -2.*xi)
 			
-!~ end function reconstruction
+end function reconstruction1D
+
+
+real(kind=DTYPE) function reconstruction2D(f,i,j,sizex,sizev,xi,eta) result (reco)
+
+	implicit none
+	
+	integer :: i,j,sizex,sizev
+	real(kind=DTYPE) :: f(-2*B:sizex+2*B, -2*B:sizev+2*B), xi, eta
+	
+	real(kind=DTYPE) ::  edges, nodes, bubble
+	
+	nodes =   f(i-1,j-1)*0.25*(xi-1.)*(eta-1.)*xi*eta &
+			+ f(i+1,j-1)*0.25*(xi+1.)*(eta-1.)*xi*eta &
+			+ f(i-1,j+1)*0.25*(xi-1.)*(eta+1.)*xi*eta &
+			+ f(i+1,j+1)*0.25*(xi+1.)*(eta+1.)*xi*eta
+	
+	edges =   f(i+1, j)*0.5*(xi+1.)*(1.-eta**2)*xi &
+			+ f(i-1, j)*0.5*(xi-1.)*(1.-eta**2)*xi &
+			+ f(i ,j+1)*0.5*(eta+1.)*(1.-xi**2)*eta &
+			+ f(i ,j-1)*0.5*(eta-1.)*(1.-xi**2)*eta 
+	
+	bubble = (1./16.)*(36.*f(i,j)-(f(i-1,j-1)+f(i+1,j-1)+f(i-1,j+1)+f(i+1,j+1))-4.*(f(i+1, j)+f(i-1, j)+f(i ,j+1)+f(i ,j-1)))*(1.-xi**2)*(1.-eta**2)
+	
+	reco = nodes+edges+bubble
+
+end function reconstruction2D
 
 subroutine boundary_fluid(E,sizex)
 	implicit none 
@@ -29,22 +58,6 @@ subroutine boundary_fluid(E,sizex)
 	
 end subroutine boundary_fluid
 		
-subroutine get_E_schwarz(fe,fi,rho,phi,E,sizex,sizev,dx,dv,qe,qi)
-  
-	implicit none 
-  
-	integer :: sizex, sizev
-	real(kind=DTYPE), dimension(-2*B:sizex+2*B,-2*B:sizev+2*B) :: fe, fi
-	real(kind=DTYPE), dimension(-2*B:sizex+2*B) :: rho, phi, E
-	real(kind=DTYPE) :: dx, dv, qe, qi
-  
-	integer :: ix, iv
-  
-	call calcRho(fe,fi,rho,sizex,sizev,dv,qe,qi)
-			  
-	call poisson_schwarz(rho,E,sizex,dx)
-			  
-end subroutine get_E_schwarz
 
 subroutine get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,dx,dv,qe,qi)
 			  
@@ -62,16 +75,100 @@ subroutine get_E_gauss_seidel(fe,fi,rho,phi,E,sizex,sizev,dx,dv,qe,qi)
 	call boundary_fluid(rho,sizex)
 			  
 	do iter=1,1000
-		call poisson_gauss_seidel2(phi,rho,eps0,sizex,dx)
+		call poisson_gauss_seidel4(phi,rho,eps0,sizex,dx)
 		call boundary_fluid(phi,sizex)
 	enddo
 			  
-	call calc_E_from_phi2(E,phi,sizex,dx)
+	call calc_E_from_phi4(E,phi,sizex,dx)
 			  
 	!check poisson solver
 	E(:) = -1.*E(:)
 			  
 end subroutine get_E_gauss_seidel
+
+subroutine get_E_gauss_seidel_point(fe,fi,rho,phi,E,sizex,sizev,dx,dv,qe,qi)
+			  
+	implicit none 
+			  
+	integer :: sizex, sizev
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B,-2*B:sizev+2*B) :: fe, fi, fe_point
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B) :: rho, phi, E
+	real(kind=DTYPE) :: dx, dv, qe, qi
+			  
+	integer :: iter
+	real(kind=DTYPE) :: eps0 = 1.
+	
+	!calculate point values with local reconstruction
+	call get_point_values(fe, fe_point, sizex, sizev)
+	
+	call calcRho(fe_point,fi,rho,sizex,sizev,dv,qe,qi)
+	call boundary_fluid(rho,sizex)
+			  
+	do iter=1,1000
+		call poisson_gauss_seidel4(phi,rho,eps0,sizex,dx)
+		call boundary_fluid(phi,sizex)
+	enddo
+			  
+	call calc_E_from_phi4(E,phi,sizex,dx)
+			  
+	!check poisson solver
+	E(:) = -1.*E(:)
+			  
+end subroutine get_E_gauss_seidel_point
+
+subroutine get_point_values(f,fpoint,sizex,sizev)
+
+	implicit none
+	
+	integer :: sizex, sizev
+	real(kind=DTYPE), dimension(-2*B:sizex+2*B,-2*B:sizev+2*B) :: f, fpoint
+	
+	integer :: i, j
+	!real(kind=DTYPE) :: xi, eta
+	
+	!use reconstruction to get full grid of point values
+	
+	do i=0, sizex
+		
+		if (mod(i,2) .eq. 0) then 
+			
+			do j=0, sizev
+				
+				if (mod(j,2) .eq. 0) then 
+					
+					fpoint(i,j) = f(i,j) !nodes
+					
+				else if (mod(j,2) .eq. 1) then 
+					
+					!fpoint(i,j) = reconstruction1D(f(i,j-1), f(i,j+1), f(i,j), 0.5) !vertical edge
+					fpoint(i,j) = reconstruction1D(f(i,:), j, 0, sizev, 0.5_8) !vertical edge
+					
+				endif
+				
+			enddo
+			
+		else if (mod(i,2) .eq. 1) then
+			
+			do j=0, sizev
+				
+				if (mod(j,2) .eq. 0) then 
+					
+					!fpoint(i,j) = reconstruction1D(f(i-1,j), f(i+1,j), f(i,j), 0.5) !horizontal edge
+					fpoint(i,j) = reconstruction1D(f(:,j), i, -2*B, sizex+2*B, 0.5_8) !horizontal edge
+					
+				else if (mod(j,2) .eq. 1) then 
+					
+					fpoint(i,j) = reconstruction2D(f, i, j, sizex, sizev, 0._8, 0._8)
+					
+				endif
+				
+			enddo
+			
+		endif
+		
+	enddo
+	
+end subroutine get_point_values
 
 subroutine calcRho(fe,fi,rho,sizex,sizev,dv,qe,qi)
 	implicit none
@@ -85,79 +182,68 @@ subroutine calcRho(fe,fi,rho,sizex,sizev,dv,qe,qi)
 
 	do ix=0,sizex !0, mx
 		rho(ix) = 0.
-		do iv=0,sizev !1, mvx
+		do iv=0,sizev-1 !1, mvx
 			rho(ix) = rho(ix) + qe*fe(ix,iv) + qi*fi(ix,iv)
 		enddo
 			rho(ix) = -rho(ix)*dv !TODO: Vorzeichen ???
 	enddo
 end subroutine calcRho
 
-subroutine poisson_schwarz(rho,E,sizex,dx)
-	implicit none
+!~ subroutine calcRho_reconstruction(fe,fi,rho,sizex,sizev,dv,qe,qi)
+!~ 	implicit none
 
-	integer :: sizex
-	real(kind=DTYPE) :: dx
-	real(kind=DTYPE) :: rho(-2*B:sizex+2*B), E(-2*B:sizex+2*B)
+!~ 	integer :: sizex,sizev
+!~ 	real(kind=DTYPE) :: dv, qe, qi
+!~ 	real(kind=DTYPE) :: rho(-2*B:sizex+2*B)
+!~ 	real(kind=DTYPE) :: fe(-2*B:sizex+2*B,0:sizev), fi(-2*B:sizex+2*B,0:sizev)
 
-	integer :: ix
-	real(kind=DTYPE), parameter :: epsilon = 1.e-6
-	real(kind=DTYPE) :: vy,vq
-	real(kind=DTYPE) :: rhoCopy(-2*B:sizex+2*B), &
-				a(-2*B:sizex+2*B), b(-2*B:sizex+2*B), &
-				x(-2*B:sizex+2*B), y(-2*B:sizex+2*B)
-
-	rhoCopy(:) = rho(:)*dx**2
-
-	a(0) = 1./(2.*(-2.-epsilon))
-	do ix = 1,sizex-1
-		a(ix) = 1. / (-2.-epsilon - a(ix-1))
-	enddo
-
-	b(0) = rhoCopy(0)/(2.*(-2.-epsilon))
-	do ix = 1,sizex-1
-		b(ix) = (rhoCopy(ix) - b(ix-1)) / (-2.-epsilon - a(ix-1))
-	enddo
-	b(sizex) = (rhoCopy(sizex) - b(sizex-1)) / ((-2.-epsilon + 1/(-2.-epsilon)) - a(sizex-1))
-
-	x(sizex) = b(sizex)
-	do ix = sizex-1,0,-1
-		x(ix) = b(ix) - a(ix)*x(ix+1)
-	enddo
-
-	b(0) = -1./2.
-	do ix = 1, sizex-1
-		b(ix) = (-1.*b(ix-1)) / (-2.-epsilon - a(ix-1))
-	enddo
-	b(sizex) = (1. - b(sizex-1)) / ((-2.-epsilon + 1./(-2.-epsilon)) - a(sizex-1))
-
-	y(sizex) = b(sizex)
-	do ix = sizex-1, 0, -1
-		y(ix) = b(ix) - a(ix)*y(ix+1)
-	enddo
-
-	vy = 1.*x(0) - 1./(-2.-epsilon)*x(sizex)
-	vq = 1.*y(0) - 1./(-2.-epsilon)*y(sizex)
-
-	do ix = 0, sizex
-		x(ix) = x(ix) - vy/(1.+vq)*y(ix)
-	enddo
-
-	E(:) = 0.
-	E(0) = -1.*(x(2) - x(sizex)) / (2.*dx)
-	do ix = 1, sizex-1
-		E(ix) = -1.*(x(ix+1) - x(ix-1)) / (2.*dx)
-	enddo
-	E(sizex) = -1.*(x(0) - x(sizex-2)) / (2.*dx)
+!~ 	integer :: ix, iv
 	
-	! E(-1) = E(mx)
-	! E(mx+1) = E(0)
-
-	! write(*,*) "Poisson: E(0)", E(0)
-	! write(*,*) "Poisson: rho(0)", rho(0)
+!~ 	!reconstruction
+	
+!~ 	!nodes
+!~ 	do ix=0, sizex, 2
+		
+!~ 		rho(ix) = 0.
+		
+!~ 		do iv=0, sizev-1
 			
-	! Periodic boundary conditions are not correct
+!~ 			rho(ix) = rho(ix) + qe*fe(ix,iv) + qi*fi(ix,iv)
+			
+!~ 		enddo
+		
+!~ 		rho(ix) = -rho(ix)*dv
+		
+!~ 	enddo
+	
+!~ 	!centers
+!~ 	do ix=1, sizex-1, 2
+	
+!~ 		rho(ix) = 0.
+		
+!~ 		do iv=0, sizev-1
+			
+!~ 			if (mod(iv,2) .eq. 0) then !horizontal edges
+				
+!~ 				center_recon = reconstruction1D(fe(ix-1,iv),fe(ix+1,iv),fe(ix,iv),0.5)
+				
+!~ 			else if (mod(iv,2) .eq. 1) then !cell centers
+				
+!~ 				center_recon = &
+!~ 				reconstruction2D(fe(ix,iv+1),fe(ix,iv-1),fe(ix-1,iv),fe(ix+1,iv),fe(ix-1,iv+1),fe(ix+1,iv+1),fe(ix-1,iv-1),fe(ix+1,iv-1),fe(ix,iv),0.,0.)
+				
+!~ 			endif
+			
+!~ 			rho(ix) = rho(ix) + qe*center_recon + qi*fi(ix,iv)
+			
+!~ 		enddo
+		
+!~ 		rho(ix) = -rho(ix)*dv
+	
+!~ 	enddo
+	
+!~ end subroutine calcRho_reconstruction
 
-end subroutine poisson_schwarz
 
 subroutine calc_E_from_phi2(E,phi,sizex,dx) ! E = -grad(phi)
 	
